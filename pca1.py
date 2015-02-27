@@ -196,6 +196,47 @@ def do_pca_on_data(ajdusted_or_unadjust):
     dev.off()
     """)
 
+def do_pca_on_data_at_specific_intervals(num_of_rows, adjusted_or_unadjust):
+    if 'adjusted' in adjusted_or_unadjust:
+        dframe = init_data("adjusted")
+    else:
+        dframe = init_data("unadjust")
+
+
+    #30 rows equals one month
+
+
+    #get a subset of the data specified by the num of rows
+    subsetdf = dframe[:num_of_rows]
+
+
+    #do pca on that subset of data
+    #create an r dataframe
+    r_dataframe = com.convert_to_r_dataframe(dframe)
+    robjects.globalenv['dataframe'] = r_dataframe
+
+    robjects.r("""
+    #log.dataframe = log(dataframe)
+    dataframe.pca <- prcomp(dataframe, center=TRUE, scale. = TRUE)
+    """)
+
+
+
+    #get the amount of variance explained by the first PC
+    summary = robjects.r("""summary(dataframe.pca)""")
+    print summary
+    print "LSJDFLSJDF"
+    #print vars(summary[0])
+    cum_proportion_of_first_pc = summary[-1][2]
+
+    #get the weights
+
+
+
+
+
+
+
 
 
 #plot_dataframe_in_r()
@@ -204,10 +245,10 @@ def do_pca_on_data(ajdusted_or_unadjust):
 #to grab an object from r
 #r_dataframe = com.convert_robj(robjects.globalenv['dataframe'])
 
-dframe = init_data('adjusted')
-plot_dataframe_in_matplotlib(dframe)
+#dframe = init_data('adjusted')
+#plot_dataframe_in_matplotlib(dframe)
 
-
+do_pca_on_data_at_specific_intervals(30,'adjusted')
 
 
 
