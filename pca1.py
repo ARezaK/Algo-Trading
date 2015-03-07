@@ -24,7 +24,7 @@ def init_data(ajdusted_or_unadjust):
     #init dataframe
     dataset = pd.DataFrame()
     #read in first table and add it to dataframe
-    frame = pd.read_csv("/Users/ameerkambod/Trading/Algo-Trading/P11_PCA_Data1/Sheet1-Table 1.csv")
+    frame = pd.read_csv("P11_PCA_Data1/Sheet1-Table 1.csv")
     dataset = dataset.append(frame,ignore_index=True)
 
     #adjust the data so sp2_0 is column name and adjusted close is the rows
@@ -41,7 +41,7 @@ def init_data(ajdusted_or_unadjust):
 
     #do the same for the second and third tables
     dataset = pd.DataFrame()
-    frame = pd.read_csv("/Users/ameerkambod/Trading/Algo-Trading/P11_PCA_Data1/Sheet2-Table 1.csv")
+    frame = pd.read_csv("P11_PCA_Data1/Sheet2-Table 1.csv")
     dataset = dataset.append(frame, ignore_index=True)
     del dataset['Symbol']
     del dataset['Date']
@@ -55,7 +55,7 @@ def init_data(ajdusted_or_unadjust):
     table2 = dataset
 
     dataset = pd.DataFrame()
-    frame = pd.read_csv("/Users/ameerkambod/Trading/Algo-Trading/P11_PCA_Data1/Sheet3-Table 1.csv")
+    frame = pd.read_csv("P11_PCA_Data1/Sheet3-Table 1.csv")
     dataset = dataset.append(frame, ignore_index=True)
     del dataset['Symbol']
     del dataset['Date']
@@ -85,10 +85,6 @@ def plot_dataframe_in_matplotlib(the_dataframe):
     #for plotting dataframe in matlplotlib
     the_dataframe.plot()
     plt.show()
-
-
-
-
 
 
 def plot_dataframe_in_r():
@@ -134,7 +130,6 @@ def plot_dataframe_in_r():
 
 
     """)
-
 
 def do_pca_on_data(ajdusted_or_unadjust):
     if 'adjusted' in ajdusted_or_unadjust:
@@ -202,36 +197,144 @@ def do_pca_on_data_at_specific_intervals(num_of_rows, adjusted_or_unadjust):
     else:
         dframe = init_data("unadjust")
 
+    #init dataframe
+    columns = ['% explained by PC1', 'Weight - SP2', 'Weight-CL2', 'Weight-TY0']
+    dataset = pd.DataFrame(columns=columns)
 
     #30 rows equals one month
+    indexer= 0
+    test = 0
+    while num_of_rows*indexer <len(dframe.values):
+        n_s_a = np.array([])
+
+        #get a subset of the data specified by the num of rows
+        subsetdf = dframe[num_of_rows*indexer:num_of_rows*(indexer+1)]
+        #print subsetdf
+
+        #do pca on that subset of data
+        #create an r dataframe
+        r_dataframe = com.convert_to_r_dataframe(subsetdf)
+        robjects.globalenv['dataframe'] = r_dataframe
+
+        robjects.r("""
+        #log.dataframe = log(dataframe)
+        dataframe.pca <- prcomp(dataframe, center=TRUE, scale. = TRUE)
+        """)
 
 
-    #get a subset of the data specified by the num of rows
-    subsetdf = dframe[:num_of_rows]
+
+        #get the amount of variance explained by the first PC
+        summary = robjects.r("""summary(dataframe.pca)""")
+        #print summary
+        #print vars(summary[0])
+        cum_proportion_of_first_pc = summary[-1][2]
+        n_s_a = np.append(n_s_a, [cum_proportion_of_first_pc])
+        #print "weight of first PC (%): ", cum_proportion_of_first_pc
 
 
-    #do pca on that subset of data
-    #create an r dataframe
-    r_dataframe = com.convert_to_r_dataframe(dframe)
-    robjects.globalenv['dataframe'] = r_dataframe
+        #get the weights
+        weightsofpca = robjects.r("""print(dataframe.pca)""")
+        #print "weights: \n", weightsofpca
+        weight_of_first_column = weightsofpca[1][0] #sp2_0
+        weight_of_second_column = weightsofpca[1][1] #cl2_0
+        weight_of_third_column = weightsofpca[1][2] #ty_0
+        n_s_a = np.append(n_s_a, [weight_of_first_column, weight_of_second_column, weight_of_third_column])
 
-    robjects.r("""
-    #log.dataframe = log(dataframe)
-    dataframe.pca <- prcomp(dataframe, center=TRUE, scale. = TRUE)
-    """)
+        #print "numpy storage array: ", n_s_a
+
+        #append this loop to toal dataframe
+        dataset.loc[len(dataset)+1] = n_s_a
+
+        #increase indexer
+        indexer += 1
+
+    print "dataset: \n",  dataset
+    return dataset
+
+def do_pca_on_data_on_rolling_data(num_of_rows, adjusted_or_unadjust):
+    if 'adjusted' in adjusted_or_unadjust:
+        dframe = init_data("adjusted")
+    else:
+        dframe = init_data("unadjust")
+
+    #init dataframe
+    columns = ['% explained by PC1', 'Weight - SP2', 'Weight-CL2', 'Weight-TY0']
+    dataset = pd.DataFrame(columns=columns)
+
+    #30 rows equals one month
+    indexer= 0
+    test = 0
+    while num_of_rows*indexer <len(dframe.values):
+        n_s_a = np.array([])
+
+        #get a subset of the data specified by the num of rows
+        subsetdf = dframe[0:num_of_rows*(indexer+1)]
+        #print subsetdf
+
+        #do pca on that subset of data
+        #create an r dataframe
+        r_dataframe = com.convert_to_r_dataframe(subsetdf)
+        robjects.globalenv['dataframe'] = r_dataframe
+
+        robjects.r("""
+        #log.dataframe = log(dataframe)
+        dataframe.pca <- prcomp(dataframe, center=TRUE, scale. = TRUE)
+        """)
 
 
 
-    #get the amount of variance explained by the first PC
-    summary = robjects.r("""summary(dataframe.pca)""")
-    print summary
-    print "LSJDFLSJDF"
-    #print vars(summary[0])
-    cum_proportion_of_first_pc = summary[-1][2]
+        #get the amount of variance explained by the first PC
+        summary = robjects.r("""summary(dataframe.pca)""")
+        #print summary
+        #print vars(summary[0])
+        cum_proportion_of_first_pc = summary[-1][2]
+        n_s_a = np.append(n_s_a, [cum_proportion_of_first_pc])
+        #print "weight of first PC (%): ", cum_proportion_of_first_pc
 
-    #get the weights
+
+        #get the weights
+        weightsofpca = robjects.r("""print(dataframe.pca)""")
+        #print "weights: \n", weightsofpca
+        weight_of_first_column = weightsofpca[1][0] #sp2_0
+        weight_of_second_column = weightsofpca[1][1] #cl2_0
+        weight_of_third_column = weightsofpca[1][2] #ty_0
+        n_s_a = np.append(n_s_a, [weight_of_first_column, weight_of_second_column, weight_of_third_column])
+
+        #print "numpy storage array: ", n_s_a
+
+        #append this loop to toal dataframe
+        dataset.loc[len(dataset)+1] = n_s_a
+
+        #increase indexer
+        indexer += 1
+
+    print "dataset: \n",  dataset
+    return dataset
 
 
+def do_pca_on_data_rolling():
+    writer = pd.ExcelWriter('rolling_pca_analysis.xlsx')
+    dataset1 = do_pca_on_data_on_rolling_data(30,'adjusted')
+    dataset1.to_excel(writer,"Rolling PCA 1 Months")
+    dataset2 = do_pca_on_data_on_rolling_data(90,'adjusted')
+    dataset2.to_excel(writer,"Rolling PCA 3 Months")
+    dataset3 = do_pca_on_data_on_rolling_data(180,'adjusted')
+    dataset3.to_excel(writer,"Rolling PCA 6 Months")
+    dataset4 = do_pca_on_data_on_rolling_data(320,'adjusted')
+    dataset4.to_excel(writer,"Rolling PCA 1 Year")
+    writer.save()
+
+def do_pca_on_data_non_rolling():
+    writer = pd.ExcelWriter('non_rolling_pca_analysis.xlsx')
+    dataset1 = do_pca_on_data_at_specific_intervals(30,'adjusted')
+    dataset1.to_excel(writer,"Non-Rolling PCA 1 Months")
+    dataset2 = do_pca_on_data_at_specific_intervals(90,'adjusted')
+    dataset2.to_excel(writer,"Non-Rolling PCA 3 Months")
+    dataset3 = do_pca_on_data_at_specific_intervals(180,'adjusted')
+    dataset3.to_excel(writer,"Non-Rolling PCA 6 Months")
+    dataset4 = do_pca_on_data_at_specific_intervals(320,'adjusted')
+    dataset4.to_excel(writer,"Non-Rolling PCA 1 Year")
+    writer.save()
 
 
 
@@ -248,8 +351,7 @@ def do_pca_on_data_at_specific_intervals(num_of_rows, adjusted_or_unadjust):
 #dframe = init_data('adjusted')
 #plot_dataframe_in_matplotlib(dframe)
 
-do_pca_on_data_at_specific_intervals(30,'adjusted')
-
+do_pca_on_data_rolling()
 
 
 
