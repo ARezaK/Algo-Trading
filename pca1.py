@@ -4,6 +4,11 @@ import pandas.rpy.common as com
 import rpy2.robjects as robjects
 import matplotlib.pyplot as plt
 import time
+import plotly
+
+#init plotly
+plotly.tools.set_credentials_file(username='shemer77', api_key='m034bapk2z', stream_ids=['0373v57h06', 'cjbitbcr9j'])
+
 
 #init instance to r
 r = robjects.r
@@ -16,6 +21,24 @@ robjects.r("""
     library(reshape)
     library(ggplot2)
     """)
+
+
+def df_to_iplot(df):
+
+    '''
+    Coverting a Pandas Data Frame to Plotly interface
+    '''
+    x = df.index.values
+    lines={}
+    for key in df:
+        lines[key]={}
+        lines[key]["x"]=x
+        lines[key]["y"]=df[key].values
+        lines[key]["name"]=key
+
+        #Appending all lines
+    lines_plotly=[lines[key] for key in df]
+    return lines_plotly
 
 def init_data(ajdusted_or_unadjust):
     adj = 0
@@ -77,14 +100,7 @@ def init_data(ajdusted_or_unadjust):
     dframe = newdataset[pd.notnull(newdataset['CL2_0'])]
     return dframe
 
-def plot_dataframe_in_matplotlib(the_dataframe):
-    #calculate percent variance
 
-    the_dataframe.pct_change(90).plot(subplots=True)
-
-    #for plotting dataframe in matlplotlib
-    the_dataframe.plot()
-    plt.show()
 
 
 def plot_dataframe_in_r():
@@ -191,15 +207,12 @@ def do_pca_on_data(ajdusted_or_unadjust):
     dev.off()
     """)
 
-def do_pca_on_data_at_specific_intervals(num_of_rows, adjusted_or_unadjust):
-    if 'adjusted' in adjusted_or_unadjust:
-        dframe = init_data("adjusted")
-    else:
-        dframe = init_data("unadjust")
+def do_pca_on_data_on_rolling_data(dframe, num_of_rows,whichpc):
 
     #init dataframe
-    columns = ['% explained by PC1', 'Weight - SP2', 'Weight-CL2', 'Weight-TY0']
+    columns = ['% explained by PC'+str(whichpc), 'Weight - SP2', 'Weight-CL2', 'Weight-TY0']
     dataset = pd.DataFrame(columns=columns)
+
 
     #30 rows equals one month
     indexer= 0
@@ -227,6 +240,7 @@ def do_pca_on_data_at_specific_intervals(num_of_rows, adjusted_or_unadjust):
         summary = robjects.r("""summary(dataframe.pca)""")
         #print summary
         #print vars(summary[0])
+
         cum_proportion_of_first_pc = summary[-1][2]
         n_s_a = np.append(n_s_a, [cum_proportion_of_first_pc])
         #print "weight of first PC (%): ", cum_proportion_of_first_pc
@@ -235,11 +249,24 @@ def do_pca_on_data_at_specific_intervals(num_of_rows, adjusted_or_unadjust):
         #get the weights
         weightsofpca = robjects.r("""print(dataframe.pca)""")
         #print "weights: \n", weightsofpca
-        weight_of_first_column = weightsofpca[1][0] #sp2_0
-        weight_of_second_column = weightsofpca[1][1] #cl2_0
-        weight_of_third_column = weightsofpca[1][2] #ty_0
-        n_s_a = np.append(n_s_a, [weight_of_first_column, weight_of_second_column, weight_of_third_column])
 
+
+
+        if whichpc ==1:
+            weight_of_first_column = weightsofpca[1][0] #sp2_0
+            weight_of_second_column = weightsofpca[1][1] #cl2_0
+            weight_of_third_column = weightsofpca[1][2] #ty_0
+            n_s_a = np.append(n_s_a, [weight_of_first_column, weight_of_second_column, weight_of_third_column])
+        elif whichpc == 2:
+            weight_of_first_column = weightsofpca[1][3] #sp2_0
+            weight_of_second_column = weightsofpca[1][4] #cl2_0
+            weight_of_third_column = weightsofpca[1][5] #ty_0
+            n_s_a = np.append(n_s_a, [weight_of_first_column, weight_of_second_column, weight_of_third_column])
+        elif whichpc == 3:
+            weight_of_first_column = weightsofpca[1][6] #sp2_0
+            weight_of_second_column = weightsofpca[1][7] #cl2_0
+            weight_of_third_column = weightsofpca[1][8] #ty_0
+            n_s_a = np.append(n_s_a, [weight_of_first_column, weight_of_second_column, weight_of_third_column])
         #print "numpy storage array: ", n_s_a
 
         #append this loop to toal dataframe
@@ -248,10 +275,10 @@ def do_pca_on_data_at_specific_intervals(num_of_rows, adjusted_or_unadjust):
         #increase indexer
         indexer += 1
 
-    print "dataset: \n",  dataset
+    #print "dataset: \n",  dataset
     return dataset
 
-def do_pca_on_data_on_rolling_data(num_of_rows, adjusted_or_unadjust):
+def do_pca_on_data_at_nonrolling_data(num_of_rows, adjusted_or_unadjust):
     if 'adjusted' in adjusted_or_unadjust:
         dframe = init_data("adjusted")
     else:
@@ -312,7 +339,7 @@ def do_pca_on_data_on_rolling_data(num_of_rows, adjusted_or_unadjust):
     return dataset
 
 
-def do_pca_on_data_rolling():
+def do_pca_on_alldata_rolling():
     writer = pd.ExcelWriter('rolling_pca_analysis.xlsx')
     dataset1 = do_pca_on_data_on_rolling_data(30,'adjusted')
     dataset1.to_excel(writer,"Rolling PCA 1 Months")
@@ -324,24 +351,154 @@ def do_pca_on_data_rolling():
     dataset4.to_excel(writer,"Rolling PCA 1 Year")
     writer.save()
 
-def do_pca_on_data_non_rolling():
+def do_pca_on_alldata_non_rolling():
     writer = pd.ExcelWriter('non_rolling_pca_analysis.xlsx')
-    dataset1 = do_pca_on_data_at_specific_intervals(30,'adjusted')
+    dataset1 = do_pca_on_data_at_nonrolling_data(30,'adjusted')
     dataset1.to_excel(writer,"Non-Rolling PCA 1 Months")
-    dataset2 = do_pca_on_data_at_specific_intervals(90,'adjusted')
+    dataset2 = do_pca_on_data_at_nonrolling_data(90,'adjusted')
     dataset2.to_excel(writer,"Non-Rolling PCA 3 Months")
-    dataset3 = do_pca_on_data_at_specific_intervals(180,'adjusted')
+    dataset3 = do_pca_on_data_at_nonrolling_data(180,'adjusted')
     dataset3.to_excel(writer,"Non-Rolling PCA 6 Months")
-    dataset4 = do_pca_on_data_at_specific_intervals(320,'adjusted')
+    dataset4 = do_pca_on_data_at_nonrolling_data(320,'adjusted')
     dataset4.to_excel(writer,"Non-Rolling PCA 1 Year")
     writer.save()
 
+def convert_dataframe_to_returns(dframe,period):
+    returns =  dframe.pct_change(periods=period)
+    #drop nan rows
+    returns = returns[pd.notnull(returns['SP2_0'])]
+    return returns
+
+def create_portfolio_on_returns(timeframe):
+    #converting into return series
+    dataframe = init_data('adjusted')
+    print dataframe
+
+    returns = convert_dataframe_to_returns(dataframe,timeframe)
+
+    #each stock gets 33,333 dollars
+    current_allocation_sp20 = 33333
+    current_allocation_cl20 = 33333
+    current_allocation_ty0  = 33333
+
+    #create a new dataframe that has one column Total portfolio balance
+    columns = ["Total Portfolio Balance"]
+    total_portfolio_balance = pd.DataFrame(columns=columns)
+    total_portfolio_balance.loc[1] = '100000'
+    print "total portfolio balance: \n ", total_portfolio_balance
+
+
+    #iterover rows filling up total portfolio balance
+
+    generator = returns.iterrows()
+    for i, first in generator:
+        sp2_pct_return = first[0]
+        cl2_pct_return = first[1]
+        ty0_pct_return = first[2]
+
+        current_allocation_sp20 += current_allocation_sp20 * sp2_pct_return
+        current_allocation_cl20 += current_allocation_cl20 * cl2_pct_return
+        current_allocation_ty0 += current_allocation_ty0 * ty0_pct_return
+
+        current_portfolio = current_allocation_sp20+ current_allocation_cl20+current_allocation_ty0
+
+        #print current_portfolio
+
+        #append this balnce to toal dataframe
+        total_portfolio_balance.loc[len(total_portfolio_balance)+1] = current_portfolio
+
+    print "new total portfolio balance: \n", total_portfolio_balance
+
+    total_portfolio_balance['total_portfolio_balance_float'] = total_portfolio_balance['Total Portfolio Balance'].astype(float)
+    del total_portfolio_balance['Total Portfolio Balance']
+
+    return total_portfolio_balance
+
+def create_portfolio_on_pca(pcadataframe,returns,timeframe,whichPC):
+    current_account_balance = 100000
+
+
+    #create a new dataframe that has one column Total portfolio balance
+    columns = ["Total Portfolio Balance"]
+    total_portfolio_balance = pd.DataFrame(columns=columns)
+    total_portfolio_balance.loc[1] = '100000'
+    print "total portfolio balance: \n ", total_portfolio_balance
+
+     #iterover rows filling up total portfolio balance
+
+    generator = pcadataframe.iterrows()
+    for i, first in generator:
+        #i starts at 1
+        weight_of_sp2 = first[1]
+        weight_of_cl2 = first[2]
+        weight_of_ty0 = first[3]
+
+        pct_to_allocate_to_sp2 = np.power(weight_of_sp2,2)
+        pct_to_allocate_to_cl2 = np.power(weight_of_cl2,2)
+        pct_to_allocate_to_ty0 = np.power(weight_of_ty0,2)
+
+        amount_of_money_weighted_to_sp2 = pct_to_allocate_to_sp2*current_account_balance
+        amount_of_money_weighted_to_cl2 = pct_to_allocate_to_cl2*current_account_balance
+        amount_of_money_weighted_to_ty0 = pct_to_allocate_to_ty0*current_account_balance
+
+        #get subset of daily returns corresponding to that PC timeframe
+        subsetdf = returns[i*timeframe:(i+1)*timeframe]
+
+        print subsetdf
+        generator2 = subsetdf.iterrows()
+        for i2, first2 in generator2:
+            sp2_pct_return = first2[0]
+            cl2_pct_return = first2[1]
+            ty0_pct_return = first2[2]
+
+            amount_of_money_weighted_to_sp2 += amount_of_money_weighted_to_sp2 * sp2_pct_return
+            amount_of_money_weighted_to_cl2 += amount_of_money_weighted_to_cl2 * cl2_pct_return
+            amount_of_money_weighted_to_ty0 += amount_of_money_weighted_to_ty0 * ty0_pct_return
 
 
 
+            #print "current: \n", current_account_balance
+            #i can either move this in the loop or out of it
+            current_account_balance = amount_of_money_weighted_to_sp2+ amount_of_money_weighted_to_cl2+amount_of_money_weighted_to_ty0
+            #append this balnce to toal dataframe
+            total_portfolio_balance.loc[len(total_portfolio_balance)+1] = current_account_balance
+            #print "acct_balance: \n", current_account_balance
 
 
 
+    print "new total portfolio balance: \n", total_portfolio_balance
+
+    total_portfolio_balance['PCA_'+str(whichPC)] = total_portfolio_balance['Total Portfolio Balance'].astype(float)
+    del total_portfolio_balance['Total Portfolio Balance']
+
+    return total_portfolio_balance
+
+
+def create_pca_portfolio(whichPC,timeframe):
+    dataframe = init_data('adjusted')
+
+    #create dataframe of daily percentage returns
+    returns = convert_dataframe_to_returns(dataframe,1)
+
+    dataset = do_pca_on_data_on_rolling_data(returns, 30, whichPC)
+    print "datastesdfsd"
+    #print "dataset: \n", dataset
+    pca_portfolio = create_portfolio_on_pca(dataset,returns,timeframe,whichPC)
+    print "SDFL;jsdf"
+    return pca_portfolio
+
+
+# dataset1 = do_pca_on_data_at_specific_intervals(320,'adjusted')
+# #lets delete the first column (% explaiend by variance)
+# del dataset1['% explained by PC1']
+#
+# plt.figure()
+#
+# dataset1.plot()
+#
+# plt.savefig("non-rolling - 1Y intervals")
+#
+# #
 #plot_dataframe_in_r()
 #do_pca_on_data('adjusted')
 
@@ -351,7 +508,25 @@ def do_pca_on_data_non_rolling():
 #dframe = init_data('adjusted')
 #plot_dataframe_in_matplotlib(dframe)
 
-do_pca_on_data_rolling()
+pca1_portfolio = create_pca_portfolio(1,30)
+pca2_portfolio = create_pca_portfolio(2,30)
+pca3_portfolio = create_pca_portfolio(3,30)
+base_portfolio = create_portfolio_on_returns(1)
+print "pca protfoiltio: \n ", pca1_portfolio
+print "base portfiolio: \n", base_portfolio
+
+
+#merge the two dataframes. This doesnt work b/c pca protfiolio is only 2000 rows
+pca1_portfolio['base_portfolio'] = base_portfolio['total_portfolio_balance_float']
+pca1_portfolio['pca2'] = pca2_portfolio['PCA_2']
+pca1_portfolio['pca3'] = pca3_portfolio['PCA_3']
+
+plotly.plotly.plot(df_to_iplot(pca1_portfolio))
+pca1_portfolio.plot()
+#base_portfolio.plot()
+plt.figure()
+plt.show()
+
 
 
 
