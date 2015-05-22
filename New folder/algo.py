@@ -15,7 +15,7 @@ from numpy import convolve
 
 
 username = 'shemer77'
-password = 'boktai2'
+
 server = xmlrpclib.Server('https://' + username + ':' + password + '@108.61.63.199:8000')
 
 logging.basicConfig(
