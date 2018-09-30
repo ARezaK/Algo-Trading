@@ -117,7 +117,7 @@ def plot_dataframe_in_r():
     #init dataframe
     dataset = pd.DataFrame()
     #read in first table and add it to dataframe
-    frame = pd.read_csv("/Users/ameerkambod/Trading/Algo-Trading/P11_PCA_Data1/Sheet1-Table 1.csv")
+    frame = pd.read_csv("")
     dataset = dataset.append(frame,ignore_index=True)
 
     del dataset['Symbol']
